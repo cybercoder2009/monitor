@@ -1,0 +1,29 @@
+{
+  "name": "src",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "chris",
+  "license": "ISC",
+  "dependencies": {
+    "babelify": "*",
+    "browserify": "*",
+    "gulp": "*",
+    "gulp-cssnano": "*",
+    "gulp-less": "*",
+    "gulp-plumber": "*",
+    "gulp-uglify": "*",
+    "gulp-watch": "*",
+    "history": "*",
+    "moment": "*",
+    "react": "*",
+    "react-dom": "*",
+    "react-redux": "*",
+    "reactify": "*",
+    "redux": "*",
+    "vinyl-source-stream": "*"
+  }
+}
