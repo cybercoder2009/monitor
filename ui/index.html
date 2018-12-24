@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+    <script>
+        // Let us open a web socket
+        var ws = new WebSocket("ws://localhost:8888/echo");
+        ws.onopen = function() {
+            // Web Socket is connected, send data using send()
+            ws.send("Message to send");
+        }
+        ws.onmessage = function (evt) {
+            var received_msg = evt.data;
+        }
+        ws.onclose = function() {
+
+            // websocket is closed.
+        }
+    </script>
+</body>
+</html>

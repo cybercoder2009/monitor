@@ -1,9 +1,19 @@
-extern crate p2p;
+extern crate ws;
 extern crate uuid;
+extern crate p2p;
+extern crate ctrlc;
+extern crate serde_json;
+
+pub mod api;
 
 use std::thread;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool,Ordering};
+use std::sync::Arc;
+use std::fs::File;
+use std::io::Read;
 use uuid::Uuid;
+use serde_json::Value;
 use p2p::P2p;
 use p2p::node::NodeInfo;
 use p2p::routes::REQ_HANDSHAKE;
@@ -30,47 +40,44 @@ use p2p::sync::handlers::req_bodies;
 use p2p::sync::handlers::res_bodies;
 use p2p::sync::handlers::broadcast_block;
 use p2p::sync::handlers::broadcast_tx;
+use api::Ws;
 
 fn main() {
 
+//    let running = Arc::new(AtomicBool::new(true));
+//    let r = running.clone();
+//    ctrlc::set_handler(move || {
+//        r.store(false, Ordering::SeqCst);
+//    }).expect("Error setting Ctrl-C handler");
+
+    //let chain = read_seeds("chain_mainnet.json");
+    let chain = read_seeds("chain_mastery.json");
+    //let chain = read_seeds("chain_custom.json");
     let my_uuid = Uuid::new_v4();
     let s = my_uuid.to_string();
     let mut node_id: [u8;36] = [0x00u8; 36];
     node_id[0 .. 36].copy_from_slice(&s.as_bytes()[0 .. 36]);
-
     let mut boot_nodes: Vec<NodeInfo> = Vec::new();
-
-    // aion main net seed
-//    boot_nodes.push(NodeInfo {
-//        if_seed: true,
-//        node_id: String::from("c33d1066-8c7e-496c-9c4e-c89318280274"),
-//        ip: String::from("13.92.155.115"),
-//        port: 30303,
-//    });
-//    boot_nodes.push(NodeInfo {
-//        if_seed: true,
-//        node_id: String::from("c88d1066-8c7e-496c-9c4e-c89318280274"),
-//        ip: String::from("127.0.0.1"),
-//        port: 30303,
-//    });
-//    aion
-    boot_nodes.push(NodeInfo {
-        if_seed: true,
-        node_id: String::from("c33d1066-8c7e-496c-9c4e-c89318280274"),
-        ip: String::from("66.207.217.190"),
-        port: 30303,
-    });
+    let net_id: u32 = chain["net_id"].as_u64().unwrap() as u32;
+    let nodes = chain["nodes"].as_array().unwrap();
+    for node in nodes {
+        boot_nodes.push(NodeInfo {
+            if_seed: true,
+            node_id: String::from(node["id"].as_str().unwrap()),
+            ip: String::from(node["ip"].as_str().unwrap()),
+            port: node["port"].as_u64().unwrap() as u16,
+        });
+    }
 
     let mut p2p = P2p::new(
         false,
         true,
-        256,
+        net_id,
         node_id,
         boot_nodes,
         5,
-        10,
+        100,
     );
-
     p2p.register(REQ_STATUS, req_status);
     p2p.register(RES_STATUS, res_status);
     p2p.register(REQ_HEADERS, req_headers);
@@ -79,9 +86,9 @@ fn main() {
     p2p.register(RES_BODIES, res_bodies);
     p2p.register(BROADCAST_TX, broadcast_tx);
     p2p.register(BROADCAST_BLOCK, broadcast_block);
-
     p2p.run();
-    // http::run();
+
+    let ws = Ws::new(String::from("127.0.0.1"),8888);
     ws.run();
 
     // shutdown hook
@@ -95,4 +102,12 @@ fn main() {
         }
     }
     println!("<core-shutdown>");
+}
+
+fn read_seeds(file: &str) -> Value{
+    let file = File::open(file)
+        .expect("file should open read only");
+    let json: Value = serde_json::from_reader(file)
+        .expect("file should be proper JSON");
+    json
 }
