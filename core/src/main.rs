@@ -1,25 +1,28 @@
 extern crate ws;
 extern crate uuid;
 extern crate p2p;
-extern crate ctrlc;
+extern crate serde;
 extern crate serde_json;
+#[macro_use]
+extern crate serde_derive;
 
 pub mod api;
+pub mod types;
 
 use std::thread;
-use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool,Ordering};
+// use std::collections::HashMap;
+// use std::sync::atomic::{AtomicBool,Ordering};
 use std::sync::Arc;
 use std::fs::File;
-use std::io::Read;
+// use std::io::Read;
 use uuid::Uuid;
 use serde_json::Value;
 use p2p::P2p;
 use p2p::node::NodeInfo;
-use p2p::routes::REQ_HANDSHAKE;
-use p2p::routes::RES_HANDSHAKE;
-use p2p::routes::REQ_ACTIVE_NODES;
-use p2p::routes::RES_ACTIVE_NODES;
+// use p2p::routes::REQ_HANDSHAKE;
+// use p2p::routes::RES_HANDSHAKE;
+// use p2p::routes::REQ_ACTIVE_NODES;
+// use p2p::routes::RES_ACTIVE_NODES;
 use p2p::routes::REQ_STATUS;
 use p2p::routes::RES_STATUS;
 use p2p::routes::REQ_HEADERS;
@@ -28,10 +31,10 @@ use p2p::routes::REQ_BODIES;
 use p2p::routes::RES_BODIES;
 use p2p::routes::BROADCAST_TX;
 use p2p::routes::BROADCAST_BLOCK;
-use p2p::handlers::req_handshake;
-use p2p::handlers::res_handshake;
-use p2p::handlers::req_active_nodes;
-use p2p::handlers::res_active_nodes;
+//use p2p::handlers::req_handshake;
+// use p2p::handlers::res_handshake;
+// use p2p::handlers::req_active_nodes;
+// use p2p::handlers::res_active_nodes;
 use p2p::sync::handlers::req_status;
 use p2p::sync::handlers::res_status;
 use p2p::sync::handlers::req_headers;
@@ -88,7 +91,7 @@ fn main() {
     p2p.register(BROADCAST_BLOCK, broadcast_block);
     p2p.run();
 
-    let ws = Ws::new(String::from("127.0.0.1"),8888);
+    let ws = Ws::new(String::from("127.0.0.1"),8888, Arc::new(p2p));
     ws.run();
 
     // shutdown hook

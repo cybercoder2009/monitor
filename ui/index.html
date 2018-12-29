@@ -2,23 +2,206 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <title>Nodes | Aion Network</title>
+    <link rel=icon href=favicon.ico sizes="16x16" type="image/png" />
+    <style type="text/css">
+        body,html{
+            margin:0;
+            padding:0;
+            background:#000;
+            color:#fff;
+            font-family:sans-serif;
+            font-size:13px;
+            line-height:20px;
+            height:100%
+        }
+        #container,#copyright,#panel{
+            position:absolute
+        }
+        #container{
+            width:100%;height:100%
+        }
+        #panel{
+            z-index:1;
+            padding:10px;
+            color:rgba(0,255,192,.8);
+            cursor:pointer
+        }
+        table {
+            border: 1px solid rgba(0,255,192,.5);
+            padding: 3px;
+        }
+        td,th{
+            text-align:right
+        }
+        tr:hover{
+            color:rgba(0,255,192,1);
+        }
+        #copyright{
+            right:10px;bottom:10px
+        }
+    </style>
 </head>
 <body>
-    <script>
-        // Let us open a web socket
-        var ws = new WebSocket("ws://localhost:8888/echo");
-        ws.onopen = function() {
-            // Web Socket is connected, send data using send()
-            ws.send("Message to send");
-        }
-        ws.onmessage = function (evt) {
-            var received_msg = evt.data;
-        }
-        ws.onclose = function() {
 
-            // websocket is closed.
+    <div id="panel"></div>
+    <div id="container"></div>
+    <div id="copyright">aion @ 2018, chaion @ 2018</div>
+    <script type="application/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/three.js/99/three.js"></script>
+    <script type="application/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/17.2.0/Tween.min.js"></script>
+    <script type="application/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/Detect.js/2.2.2/detect.min.js"></script>
+    <script type="application/javascript" src="globe1.js"></script>
+    <script type="application/javascript">
+
+        let globe = window.Globe(document.getElementById('container'), {
+            colorFn: function() {
+                return new THREE.Color([
+                    0xff5050,0xff6600,0xff9933,
+                    0xffcc00,0xffff00,0xccff33,
+                    0x99ff33,0x66ff33,0x33cc33
+                ]);
+            }
+        });
+        globe.animate();
+
+        const end_point = 'ws://localhost:8888/echo';
+        const cached_nodes = {};
+        const cached_geoip = {};
+        const timeout = 60000;
+        const interval_status = 5000, interval_timeout = 60000, interval_redraw = 3000;
+
+        function geoip(ip){
+            let xhr = new XMLHttpRequest();
+            xhr.open('GET', 'https://freegeoip.app/json/' + ip, true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4 && xhr.status === 200) {
+                    let data = JSON.parse(xhr.responseText);
+                    //console.log('ip ' + data.ip + ' lat ' + data.latitude + ' lng ' + data.longitude);
+                    cached_geoip[ip] = cached_geoip[ip] || {};
+                    cached_geoip[ip].lat = data.latitude;
+                    cached_geoip[ip].lng = data.longitude;
+                }
+            };
+            xhr.send(null);
         }
+
+        function receive(evt) {
+            let data = JSON.parse(evt.data);
+            for(let i = 0, m = data.length; i < m; i++){
+                if(!cached_geoip.hasOwnProperty(data[i].ip)){
+                    geoip(data[i].ip);
+                }
+                if(cached_nodes.hasOwnProperty(data[i].id)) {
+                    cached_nodes[data[i].id].bh = data[i].block_hash;
+                    cached_nodes[data[i].id].bn = data[i].block_number;
+                    cached_nodes[data[i].id].td = data[i].total_difficulty;
+                    cached_nodes[data[i].id].up = Date.now();
+                } else {
+                    cached_nodes[data[i].id] = {
+                        ip: data[i].ip,
+                        pt: data[i].port,
+                        rv: data[i].revision,
+
+                        bh: data[i].block_hash,
+                        bn: data[i].block_number,
+                        td: data[i].total_difficulty,
+                        up: Date.now()
+                    }
+                }
+            }
+        }
+
+        // task - status
+        setInterval(()=>{
+            console.log('[status] cached_nodes=' + Object.keys(cached_nodes).length + ' cached_geoip=' + Object.keys(cached_geoip).length)
+        }, interval_status);
+
+        // task - timeout node
+        setInterval(()=>{
+            let now = Date.now();
+            for(let id in cached_nodes){
+                let diff = now - cached_nodes[id].up;
+                if(diff > timeout){
+                    delete cached_nodes[id];
+                }
+            }
+        }, interval_timeout);
+
+        // task - redraw points
+        setInterval(()=>{
+            let groups = [], nodes = [];
+            let stats_td = {}, stats_rv = {};
+            let td_sum = 0, td_count = 0, td_avg = 0, td_peak = 0;
+
+            // fill up lat & lng
+            for (let id in cached_nodes){
+                let node = cached_nodes[id];
+                let geoip = cached_geoip[node.ip];
+                if(geoip) {
+
+                    td_sum += node.td;
+                    td_count ++;
+                     if(node.td > td_peak)
+                        td_peak = node.td;
+                    node.lat = geoip.lat;
+                    node.lng = geoip.lng;
+
+                    // for globe points
+                    nodes.push(node.lat);
+                    nodes.push(node.lng);
+                    nodes.push(0.1); // size
+                    nodes.push('0xff0000'); // color
+
+                    // for panel
+                    groups.push({
+                        id,
+                        rv: node.rv,
+                        ip: node.ip,
+                        pt: node.pt,
+                        lat: node.lat,
+                        lng: node.lng,
+
+                        td: node.td,
+                        bn: node.bn,
+                        bh: node.bh
+                    });
+
+                }
+            }
+            td_avg = td_sum / td_count;
+
+            globe.addData(nodes, {format: 'legend'});
+            globe.createPoints();
+
+            let m = groups.length;
+            if(m > 0){
+                groups.sort((a, b)=>{
+                    if (a.td > b.td) return -1;
+                    if (a.td < b.td) return 1;
+                    else return 0
+                });
+                let div_panel = document.getElementById('panel');
+                let table = '<table><tr><th>td</th><th>bn</th><th>ip</th><th>rv</th></tr>';
+                for(let i = 0; i < m; i++){
+                    table +=
+                        '<tr><td>' + groups[i].td + '</td>'
+                        + '<td>' + groups[i].bn + '</td>'
+                        + '<td>' + groups[i].ip + '</td>'
+                        + '<td>' + groups[i].rv + '</td><tr>';
+                }
+                div_panel.innerHTML = table + '</table>';
+            }
+        }, interval_redraw);
+        
+        let ws;
+        setInterval(()=>{
+            if(!ws || ws.readyState !== 1) {
+                ws = new WebSocket(end_point);
+                ws.onmessage = function(evt) {
+                    receive(evt);
+                }
+            }
+        }, 5000);
     </script>
 </body>
 </html>
